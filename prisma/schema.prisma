@@ -50,7 +50,10 @@ model User {
   approveSteps        ApproveStep[]
 
   departmentHead      Department[] @relation("DepartmentHead")
+
+  @@map("user") 
 }
+
 
 model PersonnelType {
   id   Int    @id @default(autoincrement())
