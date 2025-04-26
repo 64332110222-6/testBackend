@@ -1,9 +1,11 @@
+// schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "mysql" // หรือปรับเป็น provider ที่ใช้งานอยู่
   url      = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
@@ -37,6 +39,7 @@ model User {
   employmentType     String?
   profilePicturePath String?
 
+  // Relations
   department          Department           @relation(fields: [departmentId], references: [id])
   personnelType       PersonnelType        @relation(fields: [personnelTypeId], references: [id])
   auditLogs           AuditLog[]
@@ -47,20 +50,22 @@ model User {
   leaveRequests       LeaveRequest[]
   leaveRequestDetails LeaveRequestDetail[]
   userRanks           UserRank[]
-  approveSteps        ApproveStep[]
+  approveSteps        ApproveStep[] // สำหรับนโยบายอนุมัติ (ถ้าใช้ผู้อนุมัติที่เป็นผู้ใช้งาน)
 
-  departmentHead      Department[] @relation("DepartmentHead")
+  Department Department[] @relation("DepartmentHead")
 
-  @@map("user") 
+  @@map("user")
 }
-
 
 model PersonnelType {
   id   Int    @id @default(autoincrement())
   name String
 
+  // Relations
   users User[]
-  ranks Rank[]
+  Rank  Rank[]
+
+  @@map("personnel_type")
 }
 
 model Department {
@@ -70,17 +75,23 @@ model Department {
   name           String
   appointDate    DateTime?
 
+  // Relations
   head         User?        @relation("DepartmentHead", fields: [headId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
   users        User[]
+
+  @@map("department")
 }
 
 model Organization {
   id   Int    @id @default(autoincrement())
   name String
 
+  // Relations
   departments  Department[]
   approveSteps ApproveStep[]
+
+  @@map("organization")
 }
 
 model AuditLog {
@@ -91,8 +102,11 @@ model AuditLog {
   details        String?
   createdAt      DateTime @default(now())
 
+  // Relations
   user         User         @relation(fields: [userId], references: [id])
   leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id])
+
+  @@map("audit_log")
 }
 
 model Notification {
@@ -101,14 +115,20 @@ model Notification {
   message   String
   createdAt DateTime @default(now())
 
+  // Relations
   user User @relation(fields: [userId], references: [id])
+
+  @@map("notification")
 }
 
 model Role {
   id   Int    @id @default(autoincrement())
   name String
 
+  // Relations
   userRoles UserRole[]
+
+  @@map("role")
 }
 
 model UserRole {
@@ -120,6 +140,7 @@ model UserRole {
   role Role @relation(fields: [roleId], references: [id])
 
   @@unique([userId, roleId])
+  @@map("user_role")
 }
 
 model Signature {
@@ -128,23 +149,31 @@ model Signature {
   file   String
 
   user User @relation(fields: [userId], references: [id])
+
+  @@map("signature")
 }
 
 model ApproveStep {
   id             Int       @id @default(autoincrement())
-  approveId      Int?
+  approveId      Int? // หากมีการอ้างอิงถึงกระบวนการหรือ policy ภายนอก
   userId         Int
   organizationId Int
   level          Int
   appointDate    DateTime?
 
+  // Relations
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("approve_step")
 }
 
 model Approver {
   id   Int    @id @default(autoincrement())
   name String
+  // อาจมี relation เพิ่มเติมในอนาคต หากต้องการแยกข้อมูลผู้อนุมัติออกจาก User
+
+  @@map("approver")
 }
 
 model Rank {
@@ -156,11 +185,14 @@ model Rank {
   maxDays         Int?
   isBalance       Boolean?
   personnelTypeId Int
-  leaveTypeId     Int
+  leaveTypeId     Int // nullable สำหรับความปลอดภัย
 
+  // Relations
   userRanks     UserRank[]
   personnelType PersonnelType @relation(fields: [personnelTypeId], references: [id])
   leaveType     LeaveType     @relation(fields: [leaveTypeId], references: [id])
+
+  @@map("rank")
 }
 
 model UserRank {
@@ -172,6 +204,7 @@ model UserRank {
   rank Rank @relation(fields: [rankId], references: [id])
 
   @@unique([userId, rankId])
+  @@map("user_rank")
 }
 
 model LeaveBalance {
@@ -183,8 +216,11 @@ model LeaveBalance {
   pendingDays   Int
   remainingDays Int
 
+  // Relations
   user      User      @relation(fields: [userId], references: [id])
   leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@map("leave_balance")
 }
 
 model LeaveType {
@@ -192,9 +228,12 @@ model LeaveType {
   name        String
   isAvailable Boolean @default(true)
 
+  // Relations
   leaveBalances LeaveBalance[]
   leaveRequests LeaveRequest[]
-  ranks         Rank[]
+  Rank          Rank[]
+
+  @@map("leave_type")
 }
 
 model LeaveRequest {
@@ -217,11 +256,14 @@ model LeaveRequest {
   receiverId         Int?
   contact            String?
 
+  // Relations
   user                User                 @relation(fields: [userId], references: [id])
   leaveType           LeaveType            @relation(fields: [leaveTypeId], references: [id])
   auditLogs           AuditLog[]
   files               File[]
   leaveRequestDetails LeaveRequestDetail[]
+
+  @@map("leave_request")
 }
 
 model File {
@@ -231,7 +273,10 @@ model File {
   filePath       String
   uploadedAt     DateTime @default(now())
 
+  // Relations
   leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id])
+
+  @@map("file")
 }
 
 model LeaveRequestDetail {
@@ -244,11 +289,13 @@ model LeaveRequestDetail {
   remarks        String?
   comment        String?
 
+  // Relations
   approver     User         @relation(fields: [approverId], references: [id])
   leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id])
 
   @@index([approverId])
   @@index([leaveRequestId])
+  @@map("leave_request_detail")
 }
 
 model Holiday {
@@ -258,6 +305,8 @@ model Holiday {
   fiscalYear  Int
   isRecurring Boolean  @default(false)
   holidayType String?
+
+  @@map("holiday")
 }
 
 model Setting {
@@ -268,4 +317,6 @@ model Setting {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@map("setting")
 }
