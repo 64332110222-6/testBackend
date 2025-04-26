@@ -89,7 +89,7 @@ class UserService {
   }
 
   static async getUserByEmail(email) {
-    return await prisma.user.findUnique({
+    return await prisma.User.findUnique({
       where: { email },
       include: {
         personnelType: true,
