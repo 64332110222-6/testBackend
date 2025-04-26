@@ -1,0 +1,320 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql" // หรือปรับเป็น provider ที่ใช้งานอยู่
+  url      = env("DATABASE_URL")
+}
+
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FileType {
+  EVIDENT
+  REPORT
+  PAPER
+}
+
+model User {
+  id                 Int      @id @default(autoincrement())
+  departmentId       Int
+  personnelTypeId    Int
+  prefixName         String?
+  firstName          String
+  lastName           String
+  sex                String
+  email              String   @unique
+  password           String
+  phone              String?
+  position           String?
+  hireDate           DateTime
+  inActive           Boolean  @default(false)
+  employmentType     String?
+  profilePicturePath String?
+
+  // Relations
+  department          Department           @relation(fields: [departmentId], references: [id])
+  personnelType       PersonnelType        @relation(fields: [personnelTypeId], references: [id])
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+  userRoles           User_Role[]
+  signatures          Signature[]
+  leaveBalances       LeaveBalance[]
+  leaveRequests       LeaveRequest[]
+  leaveRequestDetails LeaveRequestDetail[]
+  userRanks           User_Rank[]
+  approveSteps        ApproveStep[] // สำหรับนโยบายอนุมัติ (ถ้าใช้ผู้อนุมัติที่เป็นผู้ใช้งาน)
+
+  Department Department[] @relation("DepartmentHead")
+
+  @@map("user")
+}
+
+model PersonnelType {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  // Relations
+  users User[]
+  Rank  Rank[]
+
+  @@map("personneltype")
+}
+
+model Department {
+  id             Int       @id @default(autoincrement())
+  headId         Int?
+  organizationId Int
+  name           String
+  appointDate    DateTime?
+
+  // Relations
+  head         User?        @relation("DepartmentHead", fields: [headId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+  users        User[]
+
+  @@map("department")
+}
+
+model Organization {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  // Relations
+  departments  Department[]
+  approveSteps ApproveStep[]
+
+  @@map("organization")
+}
+
+model AuditLog {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  leaveRequestId Int
+  action         String
+  details        String?
+  createdAt      DateTime @default(now())
+
+  // Relations
+  user         User         @relation(fields: [userId], references: [id])
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id])
+
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notification")
+}
+
+model Role {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  // Relations
+  userRoles User_Role[]
+
+  @@map("role")
+}
+
+model User_Role {
+  id     Int @id @default(autoincrement())
+  userId Int
+  roleId Int
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@map("user_role")
+}
+
+model Signature {
+  id     Int    @id @default(autoincrement())
+  userId Int
+  file   String
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("signature")
+}
+
+model ApproveStep {
+  id             Int       @id @default(autoincrement())
+  approveId      Int? // หากมีการอ้างอิงถึงกระบวนการหรือ policy ภายนอก
+  userId         Int
+  organizationId Int
+  level          Int
+  appointDate    DateTime?
+
+  // Relations
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@map("approvestep")
+}
+
+model Approver {
+  id   Int    @id @default(autoincrement())
+  name String
+  // อาจมี relation เพิ่มเติมในอนาคต หากต้องการแยกข้อมูลผู้อนุมัติออกจาก User
+
+  @@map("approver")
+}
+
+model Rank {
+  id              Int      @id @default(autoincrement())
+  rank            String
+  minHireMonths   Int?
+  maxHireMonths   Int?
+  receiveDays     Int?
+  maxDays         Int?
+  isBalance       Boolean?
+  personnelTypeId Int
+  leaveTypeId     Int // nullable สำหรับความปลอดภัย
+
+  // Relations
+  userRanks     User_Rank[]
+  personnelType PersonnelType @relation(fields: [personnelTypeId], references: [id])
+  leaveType     LeaveType     @relation(fields: [leaveTypeId], references: [id])
+
+  @@map("rank")
+}
+
+model User_Rank {
+  id     Int @id @default(autoincrement())
+  userId Int
+  rankId Int
+
+  user User @relation(fields: [userId], references: [id])
+  rank Rank @relation(fields: [rankId], references: [id])
+
+  @@unique([userId, rankId])
+  @@map("user_rank")
+}
+
+model LeaveBalance {
+  id            Int @id @default(autoincrement())
+  userId        Int
+  leaveTypeId   Int
+  maxDays       Int
+  usedDays      Int
+  pendingDays   Int
+  remainingDays Int
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id])
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+
+  @@map("leavebalance")
+}
+
+model LeaveType {
+  id          Int     @id @default(autoincrement())
+  name        String
+  isAvailable Boolean @default(true)
+
+  // Relations
+  leaveBalances LeaveBalance[]
+  leaveRequests LeaveRequest[]
+  Rank          Rank[]
+
+  @@map("leavetype")
+}
+
+model LeaveRequest {
+  id                 Int                @id @default(autoincrement())
+  userId             Int
+  leaveTypeId        Int
+  startDate          DateTime
+  endDate            DateTime
+  leavedDays         Int 
+  thisTimeDays       Int
+  totalDays          Int
+  balanceDays        Int
+  reason             String?
+  status             LeaveRequestStatus @default(PENDING)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  documentNumber     String?
+  documentIssuedDate DateTime?
+  verifierId         Int?
+  receiverId         Int?
+  contact            String?
+
+  // Relations
+  user                User                 @relation(fields: [userId], references: [id])
+  leaveType           LeaveType            @relation(fields: [leaveTypeId], references: [id])
+  auditLogs           AuditLog[]
+  files               File[]
+  leaveRequestDetails LeaveRequestDetail[]
+
+  @@map("leaverequest")
+}
+
+model File {
+  id             Int      @id @default(autoincrement())
+  leaveRequestId Int
+  type           FileType
+  filePath       String
+  uploadedAt     DateTime @default(now())
+
+  // Relations
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id])
+
+  @@map("file")
+}
+
+model LeaveRequestDetail {
+  id             Int                @id @default(autoincrement())
+  approverId     Int
+  leaveRequestId Int
+  stepOrder      Int
+  status         LeaveRequestStatus @default(PENDING)
+  reviewedAt     DateTime?          @default(now())
+  remarks        String?
+  comment        String?
+
+  // Relations
+  approver     User         @relation(fields: [approverId], references: [id])
+  leaveRequest LeaveRequest @relation(fields: [leaveRequestId], references: [id])
+
+  @@index([approverId])
+  @@index([leaveRequestId])
+  @@map("leaverequestdetail")
+}
+
+model Holiday {
+  id          Int      @id @default(autoincrement())
+  date        DateTime
+  description String
+  fiscalYear  Int
+  isRecurring Boolean  @default(false)
+  holidayType String?
+
+  @@map("holiday")
+}
+
+model Setting {
+  id          Int      @id @default(autoincrement())
+  key         String
+  type        String
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("setting")
+}
